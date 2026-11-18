@@ -257,15 +257,19 @@ export class GoTypeRef {
     } else if (typeMap.type === 'interface') {
       const prefix = asRef && typeMap.value.datatype ? '*' : '';
       const baseName = typeMap.value.name;
-      // type is defined in the same scope as the current one, no namespace required
-      if (scope.packageName === typeMap.value.namespace && baseName) {
-        // if the current scope is the same as the types scope, return without a namespace
+      const referencedPkg = typeMap.value.type?.pkg;
+      // Distinct submodules can share a final package name (e.g. `service` vs
+      // `interfaces/service`). Compare full module identity so only true
+      // same-package references are left unqualified.
+      if (referencedPkg?.goModuleName === scope.goModuleName && baseName) {
         return `${prefix}${baseName}`;
       }
 
-      // type is defined in another module and requires a namespace and import
+      // Foreign types are qualified with the identifier used by the import
+      // (the Go package clause name, which is the default import alias).
       if (baseName) {
-        return `${prefix}${typeMap.value.namespace}.${baseName}`;
+        const alias = referencedPkg?.packageName ?? typeMap.value.namespace;
+        return `${prefix}${alias}.${baseName}`;
       }
     } else if (typeMap.type === 'intersection') {
       const components = typeMap.value.map((inner) =>
